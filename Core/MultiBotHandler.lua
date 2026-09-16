@@ -658,9 +658,26 @@ local function applyImportedLayoutEntry(key, value)
 		return true
 	end
 
-	local context = string.match(key, "^ButtonLayout:(.+)$")
-	if context and MultiBot.ApplySavedButtonLayout then
-		MultiBot.ApplySavedButtonLayout(context)
+	-- ButtonLayout keys are now suffixed with the orientation they were
+	-- captured under (":H" / ":V"). Only re-render immediately if it matches
+	-- what's currently on screen; the other orientation's entry is still
+	-- stored, and RefreshButtonLayoutContextsForOrientation picks it up
+	-- the next time the player switches to it.
+	local context, suffix = string.match(key, "^ButtonLayout:(.+):([HV])$")
+	if context then
+		local currentSuffix = MultiBot.verticalLayout and "V" or "H"
+		if suffix == currentSuffix and MultiBot.ApplySavedButtonLayout then
+			MultiBot.ApplySavedButtonLayout(context)
+		end
+		return true
+	end
+
+	-- Backward compat: payloads exported before orientation support existed
+	-- have no suffix at all. Treat them as belonging to horizontal (the
+	-- only orientation that existed when they were captured).
+	local legacyContext = string.match(key, "^ButtonLayout:(.+)$")
+	if legacyContext and not MultiBot.verticalLayout and MultiBot.ApplySavedButtonLayout then
+		MultiBot.ApplySavedButtonLayout(legacyContext)
 	end
 	return true
 end
@@ -937,7 +954,18 @@ local function restoreMainBarSavedStates()
 			MultiBot.frames["MultiBar"].setPoint(MultiBot.frames["MultiBar"].x, MultiBot.frames["MultiBar"].y - 34)
 		end
 	end)
-
+	if MultiBot.GetVerticalLayoutEnabled then
+  		MultiBot.verticalLayout = MultiBot.GetVerticalLayoutEnabled()
+	end
+	if MultiBot.GetInvertLayoutEnabled then
+  		MultiBot.invertLayout = MultiBot.GetInvertLayoutEnabled()
+	end
+	if MultiBot.ReflowAll then
+  		MultiBot.ReflowAll()
+	end
+	if MultiBot.RefreshButtonLayoutContextsForOrientation then
+  		MultiBot.RefreshButtonLayoutContextsForOrientation()
+	end	
 	if MultiBot.RefreshLeftLayout then
 		MultiBot.RefreshLeftLayout()
 	end

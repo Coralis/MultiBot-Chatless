@@ -28,6 +28,8 @@ local UI_DEFAULTS = {
     disableAutoCollapse = false,
     autoHideEnabled = false,
     autoHideDelay = 60,
+    verticalEnabled = false,   -- NEW
+    invertEnabled = false,     -- NEW
   },
 }
 
@@ -101,6 +103,13 @@ local function migrateLegacyConfigIntoProfile(profile)
   end
   if type(mainBar.autoHideDelay) ~= "number" or mainBar.autoHideDelay <= 0 then
     mainBar.autoHideDelay = UI_DEFAULTS.mainBar.autoHideDelay
+  end
+  -- inside migrateLegacyConfigIntoProfile(profile)
+  if type(mainBar.verticalEnabled) ~= "boolean" then
+    mainBar.verticalEnabled = UI_DEFAULTS.mainBar.verticalEnabled
+  end
+  if type(mainBar.invertEnabled) ~= "boolean" then
+    mainBar.invertEnabled = UI_DEFAULTS.mainBar.invertEnabled
   end
 end
 
@@ -180,6 +189,16 @@ function MultiBot.Config_Ensure()
   if type(legacyMainBar.autoHideDelay) ~= "number" or legacyMainBar.autoHideDelay <= 0 then
     legacyMainBar.autoHideDelay = UI_DEFAULTS.mainBar.autoHideDelay
   end
+  -- inside migrateLegacyConfigIntoProfile(profile)
+  if type(legacyMainBar.verticalEnabled) ~= "boolean" then     -- NEW
+      legacyMainBar.verticalEnabled = UI_DEFAULTS.mainBar.verticalEnabled
+  end
+  if type(legacyMainBar.invertEnabled) ~= "boolean" then     -- NEW
+      legacyMainBar.invertEnabled = UI_DEFAULTS.mainBar.invertEnabled
+  end
+
+  MultiBot.verticalLayout = MultiBot.GetVerticalLayoutEnabled()  -- NEW: sync runtime flag on login
+  MultiBot.invertLayout = MultiBot.GetInvertLayoutEnabled()  -- NEW: sync runtime flag on login
 end
 
 -- Copy saved values into runtime timers.
@@ -376,3 +395,56 @@ function MultiBot.SetMainBarAutoHideDelay(value)
   end
   return mainBar.autoHideDelay
 end
+
+function MultiBot.GetVerticalLayoutEnabled()
+  local mainBar = MultiBot.Store and MultiBot.Store.GetMainBarStore and MultiBot.Store.GetMainBarStore()
+  local value = mainBar and mainBar.verticalEnabled
+  if type(value) == "boolean" then
+    return value
+  end
+
+  return UI_DEFAULTS.mainBar.verticalEnabled
+end
+
+function MultiBot.SetVerticalLayoutEnabled(value)
+  local mainBar = MultiBot.Store and MultiBot.Store.EnsureMainBarStore and MultiBot.Store.EnsureMainBarStore()
+  if not mainBar then
+    return UI_DEFAULTS.mainBar.verticalEnabled
+  end
+  mainBar.verticalEnabled = value and true or false
+  MultiBot.verticalLayout = mainBar.verticalEnabled
+  if MultiBot.ReflowAll then
+    MultiBot.ReflowAll()                                   -- 1. reset everything to defaults, new orientation
+  end
+  if MultiBot.RefreshButtonLayoutContextsForOrientation then
+    MultiBot.RefreshButtonLayoutContextsForOrientation()    -- 2. overlay any swaps saved for *this* orientation
+  end
+  return mainBar.verticalEnabled
+end
+
+function MultiBot.GetInvertLayoutEnabled()
+  local mainBar = MultiBot.Store and MultiBot.Store.GetMainBarStore and MultiBot.Store.GetMainBarStore()
+  local value = mainBar and mainBar.invertEnabled
+  if type(value) == "boolean" then
+    return value
+  end
+
+  return UI_DEFAULTS.mainBar.invertEnabled
+end
+
+function MultiBot.SetInvertLayoutEnabled(value)
+  local mainBar = MultiBot.Store and MultiBot.Store.EnsureMainBarStore and MultiBot.Store.EnsureMainBarStore()
+  if not mainBar then
+    return UI_DEFAULTS.mainBar.invertEnabled
+  end
+  mainBar.invertEnabled = value and true or false
+  MultiBot.invertLayout = mainBar.invertEnabled
+  if MultiBot.ReflowAll then
+    MultiBot.ReflowAll()                                   -- 1. reset everything to defaults, new orientation
+  end
+  if MultiBot.RefreshButtonLayoutContextsForOrientation then
+    MultiBot.RefreshButtonLayoutContextsForOrientation()    -- 2. overlay any swaps saved for *this* orientation
+  end
+  return mainBar.invertEnabled
+end
+  

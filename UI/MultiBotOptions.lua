@@ -253,6 +253,44 @@ local function buildLegacyOptionsContent(panel)
   autoHideDelayValueLabel:SetPoint("TOP", mainBarAutoHideDelaySlider, "BOTTOM", 0, 0)
   autoHideDelayValueLabel:SetText(mainBarAutoHideDelayLabel(mainBarAutoHideDelay))
 
+  -- NEW: Vertical Layout checkbox
+  local verticalLayoutEnabled = MultiBot.GetVerticalLayoutEnabled and MultiBot.GetVerticalLayoutEnabled() or false
+  local chkVerticalLayout = CreateFrame("CheckButton", "MultiBot_VerticalLayoutCheck", scrollChild, "InterfaceOptionsCheckButtonTemplate")
+  chkVerticalLayout:SetPoint("TOPLEFT", mainBarAutoHideDelaySlider, "BOTTOMLEFT", -8, -24)
+  _G[chkVerticalLayout:GetName() .. "Text"]:SetText(optLF("options.layout.vertical_enabled", "Vertical Layout"))
+  chkVerticalLayout.tooltipText = optLF("options.layout.vertical_enabled_desc", "Rotates the main bar: main bar layout becomes vertical")
+  chkVerticalLayout:SetChecked(verticalLayoutEnabled and true or false)
+  chkVerticalLayout:SetScript("OnClick", function(btn)
+    if MultiBot.SetVerticalLayoutEnabled then
+      MultiBot.SetVerticalLayoutEnabled(btn:GetChecked() and true or false)
+    end
+  end)
+  panel.chkVerticalLayout = chkVerticalLayout
+
+  local exportBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
+  exportBtn:SetSize(110, 22)
+  exportBtn:SetPoint("TOPLEFT", chkVerticalLayout, "BOTTOMLEFT", 8, -16)   -- was anchored to mainBarAutoHideDelaySlider
+  exportBtn:SetText(optL("options.layout.export"))
+
+  -- NEW: invert Layout checkbox
+  local invertLayoutEnabled = MultiBot.GetInvertLayoutEnabled and MultiBot.GetInvertLayoutEnabled() or false
+  local chkInvertLayout = CreateFrame("CheckButton", "MultiBot_InvertLayoutCheck", scrollChild, "InterfaceOptionsCheckButtonTemplate")
+  chkInvertLayout:SetPoint("TOPLEFT", mainBarAutoHideDelaySlider, "BOTTOMLEFT", -8, -24)
+  _G[chkInvertLayout:GetName() .. "Text"]:SetText(optLF("options.layout.invert_enabled", "Invert Layout"))
+  chkInvertLayout.tooltipText = optLF("options.layout.invert_enabled_desc", "Inverts the main bar: columns expand opposite of the default")
+  chkInvertLayout:SetChecked(invertLayoutEnabled and true or false)
+  chkInvertLayout:SetScript("OnClick", function(btn)
+    if MultiBot.SetInvertLayoutEnabled then
+      MultiBot.SetInvertLayoutEnabled(btn:GetChecked() and true or false)
+    end
+  end)
+  panel.chkInvertLayout = chkInvertLayout
+
+  local exportBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
+  exportBtn:SetSize(110, 22)
+  exportBtn:SetPoint("TOPLEFT", chkInvertLayout, "BOTTOMLEFT", 8, -16)   -- was anchored to verticalLayoutEnabled
+  exportBtn:SetText(optL("options.layout.export"))
+
   local function updateMainBarAutoHideDelaySliderState()
     local enabled = chkMainBarAutoHide:GetChecked() and true or false
     if enabled then
@@ -264,6 +302,7 @@ local function buildLegacyOptionsContent(panel)
     end
   end
 
+  
   chkMainBarAutoHide:SetScript("OnClick", function(btn)
     local enabled = btn:GetChecked() and true or false
     if MultiBot.SetMainBarAutoHideEnabled then
@@ -713,6 +752,42 @@ function MultiBot.BuildOptionsPanel()
       refreshAutoHideDelaySliderState(mainBarAutoHideEnabled and true or false)
       scroll:AddChild(autoHideDelaySlider)
       panel.autoHideDelaySlider = autoHideDelaySlider
+
+      -- NEW: Vertical Layout checkbox
+      local verticalLayoutEnabled = MultiBot.GetVerticalLayoutEnabled and MultiBot.GetVerticalLayoutEnabled() or false
+      local chkVerticalLayout = AceGUI:Create("CheckBox")
+      chkVerticalLayout:SetLabel(optLF("options.layout.vertical_enabled", "Vertical Layout"))
+      if chkVerticalLayout.SetDescription then
+        chkVerticalLayout:SetDescription(optLF("options.layout.vertical_enabled_desc", "Rotates the main bar: main bar becomes vertical."))
+      end
+      chkVerticalLayout:SetValue(verticalLayoutEnabled and true or false)
+      chkVerticalLayout:SetFullWidth(true)
+      chkVerticalLayout:SetCallback("OnValueChanged", function(_, _, value)
+        if MultiBot.SetVerticalLayoutEnabled then
+          MultiBot.SetVerticalLayoutEnabled(value and true or false)
+        end
+      end)
+      scroll:AddChild(chkVerticalLayout)
+      panel.chkVerticalLayout = chkVerticalLayout
+
+      -- NEW: Invert Layout checkbox
+      local invertLayoutEnabled = MultiBot.GetInvertLayoutEnabled and MultiBot.GetInvertLayoutEnabled() or false
+      local chkInvertLayout = AceGUI:Create("CheckBox")
+      chkInvertLayout:SetLabel(optLF("options.layout.invert_enabled", "Invert Layout"))
+      if chkInvertLayout.SetDescription then
+        chkInvertLayout:SetDescription(optLF("options.layout.invert_enabled_desc", "Inverts the main bar: expanded menus expand in the opposite direction."))
+      end
+      chkInvertLayout:SetValue(invertLayoutEnabled and true or false)
+      chkInvertLayout:SetFullWidth(true)
+      chkInvertLayout:SetCallback("OnValueChanged", function(_, _, value)
+        if MultiBot.SetInvertLayoutEnabled then
+          MultiBot.SetInvertLayoutEnabled(value and true or false)
+        end
+      end)
+      scroll:AddChild(chkInvertLayout)
+      panel.chkInvertLayout = chkInvertLayout
+
+      local ownerTitle = AceGUI:Create("Label")
 
       local ownerTitle = AceGUI:Create("Label")
       ownerTitle:SetFullWidth(true)

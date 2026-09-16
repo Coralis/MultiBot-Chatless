@@ -1,3 +1,40 @@
+-- SetPoint's xOfs/yOfs are always absolute screen-space regardless of anchor
+-- corner, so swapping them turns "spread along the row" into "spread along
+-- the column" everywhere in the engine, with no sign correction needed.
+MultiBot.OrientOffset = function(pX, pY)
+	local newX, newY = pX, pY
+	if(MultiBot.invertLayout) then
+		newX, newY = -newX, -newY
+	end
+	if(MultiBot.verticalLayout) then
+		newX, newY = newY, newX
+	end
+
+	return newX, newY
+end
+
+MultiBot.ReflowAll = function()
+	local function walk(container)
+		if(type(container) ~= "table") then return end
+		if(container.buttons) then
+			for _, btn in pairs(container.buttons) do
+				if(btn and btn.setPoint and type(btn.x) == "number") then
+					btn.setPoint(btn.x, btn.y)
+				end
+			end
+		end
+		if(container.frames) then
+			for _, sub in pairs(container.frames) do
+				if(sub and sub.setPoint and type(sub.x) == "number") then
+					sub.setPoint(sub.x, sub.y)
+				end
+				walk(sub)
+			end
+		end
+	end
+	for _, root in pairs(MultiBot.frames) do walk(root) end
+end
+
 MultiBot.CLEAR = function(pString, pAmount, o1, o2, o3)
 	for i = 1, pAmount, 1 do
 		if(o1 == nil) then
@@ -1443,7 +1480,8 @@ end
 
 MultiBot.newFrame = function(pParent, pX, pY, pSize, oWidth, oHeight, oAlign)
 	local frame = CreateFrame("Frame", nil, pParent)
-	frame:SetPoint(MultiBot.IF(oAlign ~= nil, oAlign, "BOTTOMRIGHT"), pX, pY)
+    -- newFrame(): creation
+    frame:SetPoint(MultiBot.IF(oAlign ~= nil, oAlign, "BOTTOMRIGHT"), MultiBot.OrientOffset(pX, pY))
 	if(pParent and pParent.GetFrameLevel and frame.SetFrameLevel) then
 		frame:SetFrameLevel((pParent:GetFrameLevel() or 0) + 1)
 	end
@@ -1547,8 +1585,9 @@ MultiBot.newFrame = function(pParent, pX, pY, pSize, oWidth, oHeight, oAlign)
 
 	-- SET --
 
-    frame.setPoint = function(x, y)
-        frame:SetPoint("BOTTOMRIGHT", x, y)
+	-- newFrame(): frame.setPoint
+	frame.setPoint = function(x, y)
+        frame:SetPoint("BOTTOMRIGHT", MultiBot.OrientOffset(x, y))
         frame.x = x
         frame.y = y
 		if(MultiBot.RequestClickBlockerUpdate) then MultiBot.RequestClickBlockerUpdate(frame) end
@@ -1650,7 +1689,8 @@ MultiBot.newButton = function(pParent, pX, pY, pSize, pTexture, pTip, oTemplate)
 	if(pParent and pParent.GetFrameLevel and button.SetFrameLevel) then
 		button:SetFrameLevel((pParent:GetFrameLevel() or 0) + 5)
 	end
-	button:SetPoint("BOTTOMRIGHT", pX, pY)
+	-- newButton(): creation
+	button:SetPoint("BOTTOMRIGHT", MultiBot.OrientOffset(pX, pY))
 	button:SetSize(pSize, pSize)
 	button:Show()
 
@@ -1691,8 +1731,9 @@ MultiBot.newButton = function(pParent, pX, pY, pSize, pTexture, pTip, oTemplate)
 
 	-- SET --
 
-    button.setPoint = function(x, y)
-        button:SetPoint("BOTTOMRIGHT", x, y)
+	-- newButton(): button.setPoint
+	button.setPoint = function(x, y)
+        button:SetPoint("BOTTOMRIGHT", MultiBot.OrientOffset(x, y))
         button.x = x
         button.y = y
 		if(MultiBot.RequestClickBlockerUpdate) then MultiBot.RequestClickBlockerUpdate(button.parent) end
@@ -1771,14 +1812,16 @@ MultiBot.newButton = function(pParent, pX, pY, pSize, pTexture, pTip, oTemplate)
 	-- DO --
 
 	button.doHide = function()
-		button:SetPoint("BOTTOMRIGHT", button.x, button.y)
+        button:SetPoint("BOTTOMRIGHT", MultiBot.OrientOffset(button.x, button.y))     -- doHide/doShow/OnLeave
+
 		button:SetSize(button.size, button.size)
 		button:Hide()
 		return button
 	end
 
 	button.doShow = function()
-		button:SetPoint("BOTTOMRIGHT", button.x, button.y)
+        button:SetPoint("BOTTOMRIGHT", MultiBot.OrientOffset(button.x, button.y))     -- doHide/doShow/OnLeave
+
 		button:SetSize(button.size, button.size)
 		button:Show()
 		return button
@@ -1801,7 +1844,8 @@ MultiBot.newButton = function(pParent, pX, pY, pSize, pTexture, pTip, oTemplate)
 	end)
 
 	button:SetScript("OnLeave", function()
-		button:SetPoint("BOTTOMRIGHT", button.x, button.y)
+        button:SetPoint("BOTTOMRIGHT", MultiBot.OrientOffset(button.x, button.y))     -- doHide/doShow/OnLeave
+
 		button:SetSize(button.size, button.size)
 
 		button.border:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 2, -2)
@@ -1812,7 +1856,7 @@ MultiBot.newButton = function(pParent, pX, pY, pSize, pTexture, pTip, oTemplate)
 	end)
 
 	button:SetScript("PostClick", function(pSelf, pEvent)
-		button:SetPoint("BOTTOMRIGHT", button.x - 1, button.y + 1)
+		button:SetPoint("BOTTOMRIGHT", MultiBot.OrientOffset(button.x - 1, button.y + 1)) -- PostClick depress
 		button:SetSize(button.size - 2, button.size - 2)
 
 		button.border:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 2, -2)
@@ -2097,6 +2141,10 @@ local function _mbSerializeButtonLayout(entries)
 	return table.concat(chunks, ";")
 end
 
+local function _mbButtonLayoutSaveKey(contextKey)
+	return "ButtonLayout:" .. contextKey .. (MultiBot.verticalLayout and ":V" or ":H")
+end
+
 local function _mbApplyLinkedFrameOffset(entry)
 	if(not entry or not entry.frameName) then
 		return
@@ -2120,10 +2168,11 @@ function MultiBot.BindShiftRightSwapButtons(host, contextKey, entries)
 
 	local shiftSwapGlobal = _mbEnsureRuntimeTable("_mbShiftSwapGlobal")
 	local registeredLayoutKeys = _mbEnsureRuntimeTable("_mbRegisteredButtonLayoutKeys")
-	registeredLayoutKeys["ButtonLayout:" .. contextKey] = true
+	registeredLayoutKeys["ButtonLayout:" .. contextKey .. ":H"] = true   -- was: "ButtonLayout:" .. contextKey
+	registeredLayoutKeys["ButtonLayout:" .. contextKey .. ":V"] = true   -- NEW
 	local state = shiftSwapGlobal[contextKey]
 	if(not state) then
-		local saveKey = "ButtonLayout:" .. contextKey
+		local saveKey = _mbButtonLayoutSaveKey(contextKey)   -- was: "ButtonLayout:" .. contextKey
 		local saved = MultiBot.GetSavedLayoutValue and MultiBot.GetSavedLayoutValue(saveKey) or nil
 		state = {
 			selected = nil,
@@ -2210,8 +2259,8 @@ function MultiBot.BindShiftRightSwapButtons(host, contextKey, entries)
 
 		local newAX, newAY = absBRight - parentARight, absBBottom - parentABottom
 		local newBX, newBY = absARight - parentBRight, absABottom - parentBBottom
-		buttonA.setPoint(newAX, newAY)
-		buttonB.setPoint(newBX, newBY)
+		buttonA.setPoint(MultiBot.OrientOffset(newAX, newAY))
+        buttonB.setPoint(MultiBot.OrientOffset(newBX, newBY))
 
 		_mbApplyLinkedFrameOffset(entryA)
 		_mbApplyLinkedFrameOffset(entryB)
@@ -2369,6 +2418,26 @@ function MultiBot.ApplySavedButtonLayout(contextKey)
 	end
 
 	return true
+end
+
+function MultiBot.RefreshButtonLayoutContextsForOrientation()
+	local shiftSwapGlobal = _mbGetRuntimeTable("_mbShiftSwapGlobal")
+	if(not shiftSwapGlobal) then
+		return
+	end
+
+	-- Repoint every bound context at the save string for the *current* orientation.
+	for contextKey, state in pairs(shiftSwapGlobal) do
+		state.saveKey = _mbButtonLayoutSaveKey(contextKey)
+	end
+
+	-- Then reload+apply from that key. Buttons with no saved entry for this
+	-- orientation are simply left untouched here.
+	for contextKey in pairs(shiftSwapGlobal) do
+		if(MultiBot.ApplySavedButtonLayout) then
+			MultiBot.ApplySavedButtonLayout(contextKey)
+		end
+	end
 end
 
 -- BUTTON:CAT --
